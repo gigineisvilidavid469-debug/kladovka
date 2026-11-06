@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Магазин</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{
+  --bg: var(--tg-theme-bg-color, #ffffff);
+  --text: var(--tg-theme-text-color, #111111);
+  --hint: var(--tg-theme-hint-color, #8a8a8e);
+  --btn: var(--tg-theme-button-color, #2481cc);
+  --btn-text: var(--tg-theme-button-text-color, #ffffff);
+  --card: var(--tg-theme-secondary-bg-color, #f2f2f7);
+  --line: rgba(128,128,128,.25);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:15px/1.35 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif;padding-bottom:96px}
+button,input{font:inherit;color:inherit}
+.top{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 12px 6px;border-bottom:1px solid var(--line)}
+.search{width:100%;border:0;border-radius:12px;background:var(--card);padding:10px 12px;outline:none}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:8px 0 2px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.cat{flex:0 0 auto;border:0;border-radius:999px;background:var(--card);padding:7px 13px;white-space:nowrap}
+.cat.on{background:var(--btn);color:var(--btn-text)}
+h2{font-size:17px;margin:16px 12px 8px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:0 12px}
+@media(min-width:640px){.grid{grid-template-columns:repeat(3,1fr)}}
+.card{background:var(--card);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+.pic{aspect-ratio:1/1;background:rgba(128,128,128,.12);display:flex;align-items:center;justify-content:center;font-size:44px;position:relative}
+.pic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.body{padding:10px;display:flex;flex-direction:column;gap:6px;flex:1}
+.name{font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.7em}
+.lab{color:var(--hint);font-size:13px}
+.vchips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{border:1px solid var(--line);background:transparent;border-radius:8px;padding:3px 8px;font-size:13px}
+.chip.on{border-color:var(--btn);background:var(--btn);color:var(--btn-text)}
+.price{font-weight:700;font-size:16px}
+.stock{font-size:12px;color:var(--hint)}
+.spacer{flex:1}
+.btn{border:0;border-radius:10px;background:var(--btn);color:var(--btn-text);padding:9px 12px;width:100%;font-weight:600}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--hint)}
+.btn:disabled{opacity:.6}
+.step{display:flex;align-items:center;justify-content:space-between;background:var(--bg);border-radius:10px;border:1px solid var(--line)}
+.step button{border:0;background:transparent;width:40px;height:36px;font-size:20px}
+.step span{font-weight:600}
+.empty{padding:40px 16px;text-align:center;color:var(--hint)}
+.bar{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:6;display:none}
+.bar .btn{display:flex;justify-content:space-between;padding:14px 16px;font-size:16px;box-shadow:0 4px 16px rgba(0,0,0,.25)}
+#cartView{position:fixed;inset:0;z-index:10;background:var(--bg);overflow:auto;display:none;padding-bottom:40px}
+.head{display:flex;align-items:center;gap:8px;padding:12px;position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);font-weight:700;font-size:17px}
+.head button{border:0;background:transparent;font-size:22px;padding:0 6px}
+.line{display:flex;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
+.line .info{flex:1;min-width:0}
+.line .info b{display:block}
+.line .step{width:112px;flex:none}
+.sec{padding:12px}
+.seg{display:flex;gap:8px;margin-bottom:10px}
+.seg button{flex:1;border:1px solid var(--line);background:transparent;border-radius:10px;padding:10px}
+.seg button.on{background:var(--btn);border-color:var(--btn);color:var(--btn-text)}
+.field{width:100%;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:11px 12px;margin-bottom:8px;outline:none}
+.total{display:flex;justify-content:space-between;font-weight:700;font-size:17px;padding:12px}
+.error{color:#e5484d;padding:0 12px 8px;min-height:1.2em}
+.note{color:var(--hint);font-size:13px;margin:0 0 8px}
+.done{padding:60px 20px;text-align:center}
+.done .big{font-size:56px}
+</style>
+</head>
+<body>
+<div class="top">
+  <input id="search" class="search" type="search" placeholder="🔍 Поиск по товарам">
+  <div id="cats" class="chips"></div>
+</div>
+<div id="list"></div>
+<div class="bar" id="bar"><button class="btn" data-act="open-cart"><span id="barCount"></span><span id="barSum"></span></button></div>
+
+<div id="cartView">
+  <div class="head"><button data-act="close-cart">←</button>Корзина</div>
+  <div id="cartLines"></div>
+  <div class="total"><span>Итого</span><span id="cartTotal"></span></div>
+  <div class="sec" id="form">
+    <div class="seg">
+      <button data-act="method" data-m="delivery" id="mDelivery">🚚 Доставка</button>
+      <button data-act="method" data-m="pickup" id="mPickup">🏪 Самовывоз</button>
+    </div>
+    <input class="field" id="fName" placeholder="Имя" autocomplete="name">
+    <input class="field" id="fPhone" placeholder="Телефон" type="tel" autocomplete="tel">
+    <input class="field" id="fAddress" placeholder="Адрес доставки (город, улица, дом, кв.)" autocomplete="street-address">
+    <p class="note" id="pickupNote"></p>
+  </div>
+  <div class="error" id="err"></div>
+  <div class="sec"><button class="btn" id="submit" data-act="submit"></button></div>
+</div>
+
+<div id="doneView" class="done" style="display:none"></div>
+
+<script>
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function money(n){
+  const [i, d] = String(Number.isInteger(n) ? n : Number(n).toFixed(2)).split(".");
+  return i.replace(/\B(?=(\d{3})+$)/g, " ") + (d ? "." + d : "") + " ₽";
+}
+const fmtStock = x => x == null ? "нет данных" : (Number.isInteger(x) ? x : +x.toFixed(2));
+const headers = () => ({"X-Init-Data": (tg && tg.initData) || ""});
+const haptic = () => { try { tg && tg.HapticFeedback.impactOccurred("light"); } catch(e){} };
+
+let data = {categories: [], is_admin: false, pickup_address: ""};
+let vmap = {};          // id варианта -> данные
+let keyOf = {};         // id варианта -> ключ карточки
+let items = {};         // ключ карточки -> товар
+let selected = {};      // ключ карточки -> выбранный вариант
+let cart = {};          // id варианта -> количество
+let activeCat = -1;
+let query = "";
+let method = "delivery";
+let profileLoaded = false;
+
+try { cart = JSON.parse(localStorage.getItem("cart") || "{}"); } catch(e) { cart = {}; }
+const saveCart = () => { try { localStorage.setItem("cart", JSON.stringify(cart)); } catch(e){} };
+
+async function init(){
+  try {
+    const r = await fetch("/api/catalog", {headers: headers()});
+    data = await r.json();
+  } catch(e) {
+    $("#list").innerHTML = '<div class="empty">Не удалось загрузить каталог. Попробуйте позже.</div>';
+    return;
+  }
+  data.categories.forEach((c, ci) => c.items.forEach((it, ii) => {
+    const key = ci + "_" + ii;
+    items[key] = it;
+    it.variants.forEach(v => { vmap[v.id] = Object.assign({}, v, {name: it.name}); keyOf[v.id] = key; });
+  }));
+  Object.keys(cart).forEach(id => { if (!vmap[id]) delete cart[id]; });
+  saveCart();
+  renderCats(); renderList(); refreshBar();
+}
+
+function renderCats(){
+  const all = '<button class="cat ' + (activeCat === -1 ? "on" : "") + '" data-act="cat" data-i="-1">Все</button>';
+  $("#cats").innerHTML = all + data.categories.map((c, i) =>
+    '<button class="cat ' + (activeCat === i ? "on" : "") + '" data-act="cat" data-i="' + i + '">' + esc(c.name) + '</button>').join("");
+}
+
+function emojiOf(catName){ const m = /^\S+/.exec(catName); return m && !/^[\wА-Яа-яЁё]/.test(m[0]) ? m[0] : "🛍"; }
+
+function cardHtml(key, emoji){
+  const it = items[key];
+  const sel = selected[key] != null ? selected[key] : it.variants[0].id;
+  const v = it.variants.find(x => x.id === sel) || it.variants[0];
+  const q = cart[v.id] || 0;
+  let vs = "";
+  if (it.variants.length > 1) {
+    vs = '<div class="vchips">' + it.variants.map(x =>
+      '<button class="chip ' + (x.id === v.id ? "on" : "") + '" data-act="sel" data-key="' + key + '" data-id="' + x.id + '">' + esc(x.label) + '</button>').join("") + '</div>';
+  } else if (v.label) {
+    vs = '<div class="lab">' + esc(v.label) + '</div>';
+  }
+  const price = v.price ? '<div class="price">' + money(v.price) + (v.preorder ? " 🕐" : "") + '</div>'
+                        : '<div class="lab">Цена по запросу</div>';
+  const stock = data.is_admin ? '<div class="stock">📦 ' + fmtStock(v.stock) + '</div>' : "";
+  let action;
+  if (!v.price) action = '<button class="btn ghost" disabled>Уточните в чате</button>';
+  else if (q) action = '<div class="step"><button data-act="dec" data-id="' + v.id + '">−</button><span>' + q + '</span><button data-act="inc" data-id="' + v.id + '">+</button></div>';
+  else action = '<button class="btn" data-act="inc" data-id="' + v.id + '">В корзину</button>';
+  const img = it.image ? '<img loading="lazy" src="/api/image/' + it.image + '" alt="" onerror="this.remove()">' : "";
+  return '<div class="card" data-card="' + key + '"><div class="pic">' + emoji + img + '</div><div class="body">' +
+    '<div class="name">' + esc(it.name) + '</div>' + vs + '<div class="spacer"></div>' + price + stock + action + '</div></div>';
+}
+
+function renderList(){
+  const q = query.trim().toLowerCase();
+  let html = "";
+  data.categories.forEach((c, ci) => {
+    if (activeCat !== -1 && activeCat !== ci) return;
+    const emoji = emojiOf(c.name);
+    const cards = [];
+    c.items.forEach((it, ii) => { if (!q || it.name.toLowerCase().includes(q)) cards.push(cardHtml(ci + "_" + ii, emoji)); });
+    if (cards.length) html += '<h2>' + esc(c.name) + '</h2><div class="grid">' + cards.join("") + '</div>';
+  });
+  $("#list").innerHTML = html || '<div class="empty">Ничего не найдено</div>';
+}
+
+function updateCard(key){
+  const el = document.querySelector('[data-card="' + key + '"]');
+  if (!el) return;
+  const ci = parseInt(key, 10);
+  const tmp = document.createElement("div");
+  tmp.innerHTML = cardHtml(key, emojiOf(data.categories[ci].name));
+  el.replaceWith(tmp.firstElementChild);
+}
+
+function setQty(id, q){
+  if (q <= 0) delete cart[id]; else cart[id] = Math.min(q, 99);
+  saveCart(); haptic(); refreshBar(); updateCard(keyOf[id]);
+  if ($("#cartView").style.display === "block") renderCart();
+}
+
+function cartTotals(){
+  let n = 0, sum = 0;
+  Object.entries(cart).forEach(([id, q]) => { const v = vmap[id]; if (v && v.price) { n += q; sum += v.price * q; } });
+  return {n, sum};
+}
+
+function refreshBar(){
+  const {n, sum} = cartTotals();
+  $("#bar").style.display = n ? "block" : "none";
+  $("#barCount").textContent = "🧺 Корзина · " + n;
+  $("#barSum").textContent = money(sum);
+}
+
+function renderCart(){
+  const ids = Object.keys(cart);
+  if (!ids.length) { closeCart(); return; }
+  $("#cartLines").innerHTML = ids.map(id => {
+    const v = vmap[id];
+    return '<div class="line"><div class="info"><b>' + esc(v.name) + '</b><span class="lab">' + (v.label ? esc(v.label) + " · " : "") +
+      money(v.price) + ' × ' + cart[id] + ' = ' + money(v.price * cart[id]) + '</span></div>' +
+      '<div class="step"><button data-act="dec" data-id="' + id + '">−</button><span>' + cart[id] + '</span><button data-act="inc" data-id="' + id + '">+</button></div></div>';
+  }).join("");
+  const {sum} = cartTotals();
+  $("#cartTotal").textContent = money(sum);
+  $("#mDelivery").classList.toggle("on", method === "delivery");
+  $("#mPickup").classList.toggle("on", method === "pickup");
+  $("#fAddress").style.display = method === "delivery" ? "block" : "none";
+  $("#pickupNote").textContent = method === "pickup" ? "Самовывоз: " + (data.pickup_address || "адрес уточнит менеджер") + ". Оплата при получении." : "";
+  $("#submit").textContent = method === "delivery" ? "Оплатить " + money(sum) : "Оформить заказ";
+}
+
+async function openCart(){
+  $("#cartView").style.display = "block";
+  $("#err").textContent = "";
+  renderCart();
+  if (!profileLoaded && tg && tg.initData) {
+    profileLoaded = true;
+    try {
+      const p = await (await fetch("/api/profile", {headers: headers()})).json();
+      if (!$("#fName").value) $("#fName").value = p.name || "";
+      if (!$("#fPhone").value) $("#fPhone").value = p.phone || "";
+      if (!$("#fAddress").value) $("#fAddress").value = p.address || "";
+    } catch(e) {}
+  }
+}
+function closeCart(){ $("#cartView").style.display = "none"; }
+
+function finish(icon, text){
+  $("#cartView").style.display = "none";
+  $("#bar").style.display = "none";
+  $("#list").style.display = "none";
+  $(".top").style.display = "none";
+  const d = $("#doneView");
+  d.style.display = "block";
+  d.innerHTML = '<div class="big">' + icon + '</div><h2>' + text + '</h2><p class="lab">Спасибо за заказ!</p>' +
+    '<button class="btn" data-act="close-app">Закрыть</button>';
+}
+
+async function submit(){
+  const btn = $("#submit");
+  $("#err").textContent = "";
+  btn.disabled = true;
+  const body = {
+    initData: (tg && tg.initData) || "",
+    items: Object.entries(cart).map(([id, qty]) => ({id: +id, qty})),
+    method, name: $("#fName").value, phone: $("#fPhone").value, address: $("#fAddress").value,
+  };
+  let j;
+  try {
+    const r = await fetch("/api/checkout", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+    j = await r.json();
+  } catch(e) { j = {ok: false, error: "Нет связи с сервером"}; }
+  btn.disabled = false;
+  if (!j.ok) { $("#err").textContent = j.error || "Ошибка"; return; }
+  if (j.invoice && tg) {
+    tg.openInvoice(j.invoice, status => {
+      if (status === "paid") { cart = {}; saveCart(); finish("✅", "Оплата прошла. Заказ №" + j.order_id + " принят"); }
+      else if (status === "failed") $("#err").textContent = "Оплата не прошла. Попробуйте ещё раз.";
+      else $("#err").textContent = "Оплата отменена. Нажмите кнопку ещё раз, чтобы оплатить.";
+    });
+  } else {
+    cart = {}; saveCart();
+    finish("🏪", "Заказ №" + j.order_id + " принят. Оплата при получении");
+  }
+}
+
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-act]");
+  if (!t) return;
+  const act = t.dataset.act;
+  if (act === "cat") { activeCat = +t.dataset.i; renderCats(); renderList(); window.scrollTo(0, 0); }
+  else if (act === "sel") { selected[t.dataset.key] = +t.dataset.id; updateCard(t.dataset.key); }
+  else if (act === "inc") setQty(t.dataset.id, (cart[t.dataset.id] || 0) + 1);
+  else if (act === "dec") setQty(t.dataset.id, (cart[t.dataset.id] || 0) - 1);
+  else if (act === "open-cart") openCart();
+  else if (act === "close-cart") closeCart();
+  else if (act === "method") { method = t.dataset.m; renderCart(); }
+  else if (act === "submit") submit();
+  else if (act === "close-app") { tg ? tg.close() : location.reload(); }
+});
+$("#search").addEventListener("input", e => { query = e.target.value; renderList(); });
+
+init();
+</script>
+</body>
+</html>
